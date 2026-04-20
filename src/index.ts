@@ -180,6 +180,88 @@ export async function fromPromise<T, E = Error>(
   }
 }
 
+// ─── Async Transformers ───────────────────────────────────────────────────────
+
+/**
+ * Asynchronously transforms the Ok value, passing Err through unchanged.
+ * Essential for agent tool pipelines where most operations are async.
+ *
+ * @example
+ * const result = await mapAsync(ok(userId), id => fetchUser(id));
+ */
+export async function mapAsync<T, U, E>(
+  result: Result<T, E>,
+  fn: (value: T) => Promise<U>
+): Promise<Result<U, E>> {
+  return result.ok ? ok(await fn(result.value)) : result;
+}
+
+/**
+ * Chains an async Result-returning function, flattening the nesting.
+ * Short-circuits on the first Err. The async counterpart to flatMap,
+ * and the primary building block for agent tool chains.
+ *
+ * @example
+ * const result = await flatMapAsync(parseJson(raw), json => validate(json));
+ */
+export async function flatMapAsync<T, U, E>(
+  result: Result<T, E>,
+  fn: (value: T) => Promise<Result<U, E>>
+): Promise<Result<U, E>> {
+  return result.ok ? fn(result.value) : result;
+}
+
+// ─── Branching ────────────────────────────────────────────────────────────────
+
+/**
+ * Pattern-matches both branches of a Result, returning a single value.
+ * Preferred over if/else in agent decision loops.
+ *
+ * @example
+ * const msg = match(result, {
+ *   ok:  value => `Got ${value}`,
+ *   err: error => `Failed: ${error}`,
+ * });
+ */
+export function match<T, E, U>(
+  result: Result<T, E>,
+  cases: { ok: (value: T) => U; err: (error: E) => U }
+): U {
+  return result.ok ? cases.ok(result.value) : cases.err(result.error);
+}
+
+// ─── Side Effects ─────────────────────────────────────────────────────────────
+
+/**
+ * Runs a side effect on the Ok value without changing the Result.
+ * Useful for logging or tracing in agent pipelines.
+ *
+ * @example
+ * const result = tap(fetchResult, value => logger.info("fetched", value));
+ */
+export function tap<T, E>(
+  result: Result<T, E>,
+  fn: (value: T) => void
+): Result<T, E> {
+  if (result.ok) fn(result.value);
+  return result;
+}
+
+/**
+ * Runs a side effect on the Err value without changing the Result.
+ * Useful for logging errors in agent pipelines without interrupting flow.
+ *
+ * @example
+ * const result = tapErr(fetchResult, error => logger.error("failed", error));
+ */
+export function tapErr<T, E>(
+  result: Result<T, E>,
+  fn: (error: E) => void
+): Result<T, E> {
+  if (!result.ok) fn(result.error);
+  return result;
+}
+
 // ─── Collection Utilities ─────────────────────────────────────────────────────
 
 /**
@@ -197,4 +279,39 @@ export function collect<T, E>(results: Result<T, E>[]): Result<T[], E> {
     values.push(result.value);
   }
   return ok(values);
+}
+
+/**
+ * Splits an array of Results into [successes, failures].
+ * Unlike collect, never short-circuits — processes all results.
+ * Ideal for agent fan-out patterns where partial success is acceptable.
+ *
+ * @example
+ * const [values, errors] = partition([ok(1), err("bad"), ok(3)]);
+ * // values => [1, 3], errors => ["bad"]
+ */
+export function partition<T, E>(
+  results: Result<T, E>[]
+): [T[], E[]] {
+  const values: T[] = [];
+  const errors: E[] = [];
+  for (const result of results) {
+    if (result.ok) values.push(result.value);
+    else errors.push(result.error);
+  }
+  return [values, errors];
+}
+
+/**
+ * Runs multiple async operations in parallel and collects all Results.
+ * Returns the first Err encountered, or Ok with all values.
+ * The async counterpart to collect — use when fan-out tools run concurrently.
+ *
+ * @example
+ * const result = await collectAsync([fetchUser(id), fetchOrders(id)]);
+ */
+export async function collectAsync<T, E>(
+  promises: Promise<Result<T, E>>[]
+): Promise<Result<T[], E>> {
+  return collect(await Promise.all(promises));
 }
