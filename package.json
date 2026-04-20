@@ -1,6 +1,6 @@
 {
   "name": "@vennbee/result-type",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Lightweight TypeScript Result type with Ok/Err constructors, type guards, transformers, and async utilities",
   "keywords": ["result", "result-type", "error-handling", "typescript", "ok", "err", "functional"],
   "license": "MIT",
