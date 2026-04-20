@@ -21,14 +21,21 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var index_exports = {};
 __export(index_exports, {
   collect: () => collect,
+  collectAsync: () => collectAsync,
   err: () => err,
   flatMap: () => flatMap,
+  flatMapAsync: () => flatMapAsync,
   fromPromise: () => fromPromise,
   isErr: () => isErr,
   isOk: () => isOk,
   map: () => map,
+  mapAsync: () => mapAsync,
   mapErr: () => mapErr,
+  match: () => match,
   ok: () => ok,
+  partition: () => partition,
+  tap: () => tap,
+  tapErr: () => tapErr,
   tryCatch: () => tryCatch,
   tryCatchAsync: () => tryCatchAsync,
   unwrap: () => unwrap,
@@ -88,6 +95,23 @@ async function fromPromise(promise, mapError) {
     return err(mapError ? mapError(e) : e);
   }
 }
+async function mapAsync(result, fn) {
+  return result.ok ? ok(await fn(result.value)) : result;
+}
+async function flatMapAsync(result, fn) {
+  return result.ok ? fn(result.value) : result;
+}
+function match(result, cases) {
+  return result.ok ? cases.ok(result.value) : cases.err(result.error);
+}
+function tap(result, fn) {
+  if (result.ok) fn(result.value);
+  return result;
+}
+function tapErr(result, fn) {
+  if (!result.ok) fn(result.error);
+  return result;
+}
 function collect(results) {
   const values = [];
   for (const result of results) {
@@ -96,17 +120,36 @@ function collect(results) {
   }
   return ok(values);
 }
+function partition(results) {
+  const values = [];
+  const errors = [];
+  for (const result of results) {
+    if (result.ok) values.push(result.value);
+    else errors.push(result.error);
+  }
+  return [values, errors];
+}
+async function collectAsync(promises) {
+  return collect(await Promise.all(promises));
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   collect,
+  collectAsync,
   err,
   flatMap,
+  flatMapAsync,
   fromPromise,
   isErr,
   isOk,
   map,
+  mapAsync,
   mapErr,
+  match,
   ok,
+  partition,
+  tap,
+  tapErr,
   tryCatch,
   tryCatchAsync,
   unwrap,

@@ -93,6 +93,53 @@ declare function tryCatchAsync<T, E = Error>(fn: () => Promise<T>, mapError?: (e
  */
 declare function fromPromise<T, E = Error>(promise: Promise<T>, mapError?: (e: unknown) => E): Promise<Result<T, E>>;
 /**
+ * Asynchronously transforms the Ok value, passing Err through unchanged.
+ * Essential for agent tool pipelines where most operations are async.
+ *
+ * @example
+ * const result = await mapAsync(ok(userId), id => fetchUser(id));
+ */
+declare function mapAsync<T, U, E>(result: Result<T, E>, fn: (value: T) => Promise<U>): Promise<Result<U, E>>;
+/**
+ * Chains an async Result-returning function, flattening the nesting.
+ * Short-circuits on the first Err. The async counterpart to flatMap,
+ * and the primary building block for agent tool chains.
+ *
+ * @example
+ * const result = await flatMapAsync(parseJson(raw), json => validate(json));
+ */
+declare function flatMapAsync<T, U, E>(result: Result<T, E>, fn: (value: T) => Promise<Result<U, E>>): Promise<Result<U, E>>;
+/**
+ * Pattern-matches both branches of a Result, returning a single value.
+ * Preferred over if/else in agent decision loops.
+ *
+ * @example
+ * const msg = match(result, {
+ *   ok:  value => `Got ${value}`,
+ *   err: error => `Failed: ${error}`,
+ * });
+ */
+declare function match<T, E, U>(result: Result<T, E>, cases: {
+    ok: (value: T) => U;
+    err: (error: E) => U;
+}): U;
+/**
+ * Runs a side effect on the Ok value without changing the Result.
+ * Useful for logging or tracing in agent pipelines.
+ *
+ * @example
+ * const result = tap(fetchResult, value => logger.info("fetched", value));
+ */
+declare function tap<T, E>(result: Result<T, E>, fn: (value: T) => void): Result<T, E>;
+/**
+ * Runs a side effect on the Err value without changing the Result.
+ * Useful for logging errors in agent pipelines without interrupting flow.
+ *
+ * @example
+ * const result = tapErr(fetchResult, error => logger.error("failed", error));
+ */
+declare function tapErr<T, E>(result: Result<T, E>, fn: (error: E) => void): Result<T, E>;
+/**
  * Collects an array of Results into a single Result of an array.
  * Returns the first Err encountered, or Ok with all values.
  *
@@ -101,5 +148,24 @@ declare function fromPromise<T, E = Error>(promise: Promise<T>, mapError?: (e: u
  * const bad = collect([ok(1), err("oops")]);  // Err<"oops">
  */
 declare function collect<T, E>(results: Result<T, E>[]): Result<T[], E>;
+/**
+ * Splits an array of Results into [successes, failures].
+ * Unlike collect, never short-circuits — processes all results.
+ * Ideal for agent fan-out patterns where partial success is acceptable.
+ *
+ * @example
+ * const [values, errors] = partition([ok(1), err("bad"), ok(3)]);
+ * // values => [1, 3], errors => ["bad"]
+ */
+declare function partition<T, E>(results: Result<T, E>[]): [T[], E[]];
+/**
+ * Runs multiple async operations in parallel and collects all Results.
+ * Returns the first Err encountered, or Ok with all values.
+ * The async counterpart to collect — use when fan-out tools run concurrently.
+ *
+ * @example
+ * const result = await collectAsync([fetchUser(id), fetchOrders(id)]);
+ */
+declare function collectAsync<T, E>(promises: Promise<Result<T, E>>[]): Promise<Result<T[], E>>;
 
-export { type Err, type Ok, type Result, collect, err, flatMap, fromPromise, isErr, isOk, map, mapErr, ok, tryCatch, tryCatchAsync, unwrap, unwrapOr, unwrapOrElse };
+export { type Err, type Ok, type Result, collect, collectAsync, err, flatMap, flatMapAsync, fromPromise, isErr, isOk, map, mapAsync, mapErr, match, ok, partition, tap, tapErr, tryCatch, tryCatchAsync, unwrap, unwrapOr, unwrapOrElse };
